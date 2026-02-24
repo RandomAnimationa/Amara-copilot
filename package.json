@@ -1,20 +1,57 @@
 {
   "name": "cudium-amara-extension",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "displayName": "Cudium Amara Extension",
+  "description": "Extensión tipo Copilot para Codium usando Amara (LM Studio API)",
+  "version": "0.1.0",
+  "publisher": "randomanimationa",
+  "engines": {
+    "vscode": "^1.109.0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "amaraSidebar",
+          "title": "Amara Copilot",
+          "icon": "resources/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "amaraSidebar": [
+        {
+          "id": "amaraChat",
+          "name": "Chat con Amara"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "cudium-amara-extension.suggest",
+        "title": "Obtener sugerencia de Amara"
+      },
+      {
+        "command": "cudium-amara-extension.edit",
+        "title": "Solicitar edición con Amara"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "package": "vsce package"
+  },
   "dependencies": {
-    "axios": "^1.13.5",
-    "typescript": "^5.9.3"
+    "axios": "^1.6.0"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0"
+    "@types/vscode": "^1.109.0",
+    "typescript": "^5.3.3"
   }
 }
