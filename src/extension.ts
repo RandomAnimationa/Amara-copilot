@@ -3,33 +3,8 @@ import axios from "axios";
 
 export function activate(context: vscode.ExtensionContext) {
   const provider = new AmaraChatViewProvider(context.extensionUri);
-
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("amaraChat", provider)
-  );
-
-  // Comando de sugerencia
-  context.subscriptions.push(
-    vscode.commands.registerCommand("cudium-amara-extension.suggest", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const text = editor.document.getText(editor.selection);
-        const suggestion = await provider.getCompletion(text);
-        vscode.window.showInformationMessage("Sugerencia: " + suggestion);
-      }
-    })
-  );
-
-  // Comando de edición
-  context.subscriptions.push(
-    vscode.commands.registerCommand("cudium-amara-extension.edit", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const text = editor.document.getText(editor.selection);
-        const edit = await provider.getCompletion("Edita: " + text);
-        vscode.window.showInformationMessage("Edición propuesta: " + edit);
-      }
-    })
   );
 }
 
@@ -60,7 +35,7 @@ class AmaraChatViewProvider implements vscode.WebviewViewProvider {
         <meta charset="UTF-8">
         <style>
           body { font-family: sans-serif; padding: 10px; }
-          #chat { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; }
+          #chat { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; }
           input { width: 80%; }
           button { width: 18%; }
         </style>

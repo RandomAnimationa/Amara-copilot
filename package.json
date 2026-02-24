@@ -2,18 +2,14 @@
   "name": "cudium-amara-extension",
   "displayName": "Cudium Amara Extension",
   "description": "Extensión tipo Copilot para Codium usando Amara (LM Studio API)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "randomanimationa",
   "engines": {
-    "vscode": "^1.106.0"
+    "vscode": "^1.109.0"
   },
-  "categories": [
-    "Other"
-  ],
+  "categories": ["Other"],
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "onStartupFinished"
-  ],
+  "activationEvents": ["onStartupFinished"],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -31,17 +27,7 @@
           "name": "Chat con Amara"
         }
       ]
-    },
-    "commands": [
-      {
-        "command": "cudium-amara-extension.suggest",
-        "title": "Obtener sugerencia de Amara"
-      },
-      {
-        "command": "cudium-amara-extension.edit",
-        "title": "Solicitar edición con Amara"
-      }
-    ]
+    }
   },
   "scripts": {
     "build": "tsc",
