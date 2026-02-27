@@ -1,0 +1,444 @@
+/* ===== RESET Y ESTILOS BASE ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ===== HEADER ===== */
+.chat-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-sideBar-background);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    backdrop-filter: blur(10px);
+}
+
+.chat-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-foreground);
+}
+
+.chat-header h3::before {
+    content: "✨";
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#configBtn {
+    background: none;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0.8;
+}
+
+#configBtn:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+    opacity: 1;
+    transform: rotate(30deg);
+}
+
+.model-badge {
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* ===== BARRA DE CONTEXTO ===== */
+.context-bar {
+    padding: 6px 16px;
+    background-color: var(--vscode-editor-inactiveSelectionBackground);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+    color: var(--vscode-descriptionForeground);
+}
+
+.context-file {
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-weight: 500;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+}
+
+/* ===== ÁREA DE MENSAJES ===== */
+.messages-area {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    height: 100%;
+    background-color: var(--vscode-editor-background);
+}
+
+/* Mensajes */
+.message {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.user {
+    align-items: flex-end;
+}
+
+.message.assistant {
+    align-items: flex-start;
+}
+
+.message-content {
+    max-width: 85%;
+    padding: 12px 18px;
+    border-radius: 20px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+/* ===== BURBUJA DE USUARIO (GRIS) ===== */
+.user .message-content {
+    background-color: #3a3a3a;  /* Gris oscuro para tema oscuro */
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+/* Tema claro: usuario gris claro */
+.vscode-light .user .message-content,
+body[style*="light"] .user .message-content {
+    background-color: #e0e0e0;
+    color: #000000;
+}
+
+/* ===== BURBUJA DEL ASISTENTE (NEGRO) ===== */
+.assistant .message-content {
+    background-color: #1a1a1a;  /* Casi negro para tema oscuro */
+    color: #f0f0f0;
+    border-bottom-left-radius: 4px;
+    border: 1px solid #333333;
+}
+
+/* Tema claro: asistente gris muy oscuro */
+.vscode-light .assistant .message-content,
+body[style*="light"] .assistant .message-content {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border: 1px solid #444444;
+}
+
+/* ===== ESTILOS PARA CÓDIGO (SIN RESALTADO, SOLO BLOQUE) ===== */
+.message-content pre {
+    background-color: #1e1e1e;  /* Fondo estilo VS Code oscuro */
+    padding: 16px;
+    border-radius: 12px;
+    overflow-x: auto;
+    margin: 16px 0;
+    border: 1px solid #333333;
+    position: relative;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Tema claro para pre */
+.vscode-light .message-content pre,
+body[style*="light"] .message-content pre {
+    background-color: #f5f5f5;
+    border: 1px solid #dddddd;
+    color: #333333;
+}
+
+.message-content pre code {
+    background-color: transparent;
+    padding: 0;
+    border: none;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #d4d4d4;  /* Color base tema oscuro */
+    font-family: inherit;
+    white-space: pre;
+}
+
+.vscode-light .message-content pre code,
+body[style*="light"] .message-content pre code {
+    color: #333333;
+}
+
+/* Código inline (no en bloque) */
+.message-content code:not(pre code) {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 12px;
+    background-color: #2d2d2d;
+    color: #ce9178;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #404040;
+}
+
+.vscode-light .message-content code:not(pre code),
+body[style*="light"] .message-content code:not(pre code) {
+    background-color: #f0f0f0;
+    color: #c7254e;
+    border: 1px solid #cccccc;
+}
+
+/* ===== BOTÓN COPIAR MEJORADO ===== */
+.copy-button {
+    background-color: #2d2d2d;
+    border: 1px solid #404040;
+    color: #cccccc;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: absolute;
+    top: -36px;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.3px;
+    opacity: 0.9;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+.copy-button:hover {
+    background-color: #007acc;
+    border-color: #007acc;
+    color: white;
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.copy-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.copy-button::before {
+    content: "📋";
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.copy-button.copied {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.copy-button.copied::before {
+    content: "✅";
+}
+
+/* ===== BARRA DE ENTRADA ===== */
+.input-area {
+    padding: 16px;
+    border-top: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-sideBar-background);
+    flex-shrink: 0;
+    backdrop-filter: blur(10px);
+}
+
+.input-wrapper {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 24px;
+    padding: 4px 4px 4px 16px;
+    transition: all 0.2s ease;
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 2px var(--vscode-focusBorder);
+}
+
+#prompt {
+    flex: 1;
+    min-height: 40px;
+    max-height: 120px;
+    padding: 10px 0;
+    background-color: transparent;
+    color: var(--vscode-input-foreground);
+    border: none;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+}
+
+#prompt::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+    opacity: 0.7;
+}
+
+#prompt:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#send {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    font-size: 18px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#send:hover:not(:disabled) {
+    background-color: var(--vscode-button-hoverBackground);
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+#send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ===== INDICADOR DE ESCRITURA ===== */
+.typing-indicator {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+    background-color: #1a1a1a;
+    border-radius: 24px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+    border: 1px solid #333333;
+}
+
+.vscode-light .typing-indicator,
+body[style*="light"] .typing-indicator {
+    background-color: #2d2d2d;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+    border-radius: 50%;
+    opacity: 0.6;
+    animation: typingWave 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingWave {
+    0%, 60%, 100% { 
+        transform: translateY(0);
+        opacity: 0.6;
+    }
+    30% { 
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+}
+
+/* ===== SCROLLBAR PERSONALIZADA ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+}

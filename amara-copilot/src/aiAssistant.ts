@@ -1,29 +1,24 @@
 import * as vscode from 'vscode';
 
-// Define the shape of the expected API response
-interface ChatCompletionResponse {
-    choices: Array<{
+// Definir la interfaz para la respuesta de la API
+interface APIResponse {
+    choices: {
         message: {
             content: string;
         };
-    }>;
+    }[];
 }
 
 export class AIAssistant {
-    async sendPrompt(
-        userPrompt: string,
-        contextInfo: { fileName: string; content: string } | null,
-        selectedText?: string
-    ): Promise<string> {
+    async sendPrompt(userPrompt: string, context: any, selectedText?: string): Promise<string> {
         const config = vscode.workspace.getConfiguration('amara-copilot');
-        const endpoint = config.get<string>('apiEndpoint', 'http://localhost:1234/v1/chat/completions') || 'http://localhost:1234/v1/chat/completions';
-        const model = config.get<string>('modelName', 'local-model') || 'local-model';
-        const apiKey = config.get<string>('apiKey', 'not-needed') || 'not-needed';
+        const endpoint = config.get<string>('apiEndpoint', 'http://localhost:1234/v1/chat/completions');
+        const model = config.get<string>('modelName', 'local-model');
+        const apiKey = config.get<string>('apiKey', 'not-needed');
 
-        // Construir el mensaje con contexto
         let fullPrompt = userPrompt;
-        if (contextInfo) {
-            fullPrompt = `Contexto del archivo "${contextInfo.fileName}":\n\`\`\`\n${contextInfo.content}\n\`\`\`\n\nPregunta/Instrucción: ${userPrompt}`;
+        if (context) {
+            fullPrompt = `Contexto del archivo "${context.fileName}":\n\`\`\`\n${context.content}\n\`\`\`\n\nPregunta: ${userPrompt}`;
         }
         if (selectedText) {
             fullPrompt = `Sobre el texto seleccionado:\n\`\`\`\n${selectedText}\n\`\`\`\n\n${fullPrompt}`;
@@ -32,21 +27,17 @@ export class AIAssistant {
         try {
             const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${apiKey}` 
                 },
                 body: JSON.stringify({
-                    model: model,
+                    model,
                     messages: [
-                        {
-                            role: 'system',
-                            content: 'Eres un asistente de programación útil. Puedes ayudar con código, explicaciones y ediciones. Si el usuario te pide que edites el archivo, debes responder ÚNICAMENTE con el código completo y nuevo, sin explicaciones adicionales, para que la extensión pueda aplicarlo automáticamente.'
-                        },
+                        { role: 'system', content: 'Eres un asistente de programación útil.' },
                         { role: 'user', content: fullPrompt }
                     ],
-                    temperature: 0.7,
-                    stream: false
+                    temperature: 0.7
                 })
             });
 
@@ -55,15 +46,17 @@ export class AIAssistant {
                 throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
-            // Cast the JSON response to our interface
-            const data = await response.json() as ChatCompletionResponse;
+            const data = await response.json() as APIResponse;
             
-            // Now TypeScript knows 'data' has choices[0].message.content
-            return data.choices[0]?.message?.content || 'No se recibió respuesta del modelo.';
-            
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error al contactar con la IA: ${error}`);
-            return `Lo siento, ocurrió un error: ${error}`;
+            if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                return data.choices[0].message.content;
+            } else {
+                throw new Error('Formato de respuesta inesperado');
+            }
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            vscode.window.showErrorMessage(`Error con la IA: ${errorMessage}`);
+            return `Error: ${errorMessage}`;
         }
     }
 }

@@ -1,49 +1,35 @@
 {
   "name": "amara-copilot",
   "displayName": "Amara Copilot",
-  "description": "Asistente de IA con contexto del archivo o carpeta abierta",
-  "version": "0.0.1",
-  "publisher": "randomanimationa",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": [
-    "Other"
-  ],
+  "description": "Asistente de IA con contexto del archivo o carpeta abierta. Compatible con LM Studio.",
+  "version": "0.1.0",
+  "publisher": "RandomAnimations",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "AI"],
   "activationEvents": [
     "onView:amara-copilot.chatView",
     "onCommand:amara-copilot.openPanel",
-    "onCommand:amara-copilot.openSettings"
+    "onCommand:amara-copilot.openAIConfig"
   ],
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "amara-copilot.openPanel",
-        "title": "Abrir panel de Amara Copilot"
-      },
-      {
-        "command": "amara-copilot.openSettings",
-        "title": "Abrir configuración de Amara Copilot"
-      }
+      { "command": "amara-copilot.openPanel", "title": "Abrir panel de Amara Copilot" },
+      { "command": "amara-copilot.openAIConfig", "title": "Abrir configuración de IA" }
     ],
     "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "amara-copilot-view-container",
-          "title": "Amara Copilot",
-          "icon": "media/icon.png"
-        }
-      ]
+      "activitybar": [{
+        "id": "amara-copilot-view-container",
+        "title": "Amara Copilot",
+        "icon": "media/icon.png"
+      }]
     },
     "views": {
-      "amara-copilot-view-container": [
-        {
-          "id": "amara-copilot.chatView",
-          "name": "Asistente",
-          "type": "webview"
-        }
-      ]
+      "amara-copilot-view-container": [{
+        "id": "amara-copilot.chatView",
+        "name": "Asistente",
+        "type": "webview"
+      }]
     },
     "configuration": {
       "title": "Amara Copilot",
@@ -51,42 +37,34 @@
         "amara-copilot.apiEndpoint": {
           "type": "string",
           "default": "http://localhost:1234/v1/chat/completions",
-          "description": "Endpoint de la API de LM Studio (u otra compatible con OpenAI)."
+          "description": "Endpoint de la API de LM Studio"
         },
         "amara-copilot.modelName": {
           "type": "string",
           "default": "local-model",
-          "description": "Nombre del modelo a usar en LM Studio."
+          "description": "Nombre del modelo"
         },
         "amara-copilot.apiKey": {
           "type": "string",
           "default": "not-needed",
-          "description": "Clave de API (si tu servidor la requiere)."
+          "description": "API Key (opcional)"
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run bundle",
-    "compile": "npm run bundle",
-    "watch": "npm run bundle -- --watch",
-    "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./dist/test/runTest.js"
-  },
-  "dependencies": {
-    "axios": "^1.6.0"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
+    "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.13.1",
-    "@typescript-eslint/parser": "^6.13.1",
-    "esbuild": "^0.21.0",
-    "eslint": "^8.54.0",
-    "typescript": "^5.3.2"
+    "@types/mocha": "^10.0.6",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
   },
   "repository": {
     "type": "git",

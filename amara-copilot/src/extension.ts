@@ -1,24 +1,27 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AIAssistant } from './aiAssistant';
+import { AIConfigPanel } from './aiConfigPanel';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Amara Copilot activado');
+    console.log('✅ Amara Copilot activado');
 
     const aiAssistant = new AIAssistant();
 
-    // Comando para abrir el panel (ya se abre automáticamente al hacer clic en el icono)
+    // Comando para abrir el panel de chat
     const openPanelCommand = vscode.commands.registerCommand('amara-copilot.openPanel', () => {
         vscode.commands.executeCommand('amara-copilot.chatView.focus');
     });
     context.subscriptions.push(openPanelCommand);
 
-    // Comando para abrir la configuración de VS Code directamente
-    const openSettingsCommand = vscode.commands.registerCommand('amara-copilot.openSettings', () => {
-        vscode.commands.executeCommand('workbench.action.openSettings', 'amara-copilot');
+    // Comando para abrir la configuración de IA
+    const openAIConfigCommand = vscode.commands.registerCommand('amara-copilot.openAIConfig', () => {
+        AIConfigPanel.createOrShow(context.extensionUri);
     });
-    context.subscriptions.push(openSettingsCommand);
+    context.subscriptions.push(openAIConfigCommand);
 
-    // Registrar el proveedor de la vista webview
+    // Proveedor de la vista webview (panel de chat)
     const provider = new AmaraCopilotViewProvider(context.extensionUri, aiAssistant);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('amara-copilot.chatView', provider, {
@@ -33,176 +36,158 @@ class AmaraCopilotViewProvider implements vscode.WebviewViewProvider {
         private readonly _aiAssistant: AIAssistant
     ) {}
 
-    resolveWebviewView(
+    public resolveWebviewView(
         webviewView: vscode.WebviewView,
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
+        console.log('✅ resolveWebviewView() llamado');
+
+        // Configurar opciones del webview
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri]
+            localResourceRoots: [
+                vscode.Uri.joinPath(this._extensionUri, 'media')
+            ]
         };
 
-        webviewView.webview.html = this._getHtmlForWebview();
+        // Leer el archivo HTML
+        const htmlPath = path.join(this._extensionUri.fsPath, 'media', 'chat.html');
+        let htmlContent: string;
 
-        // Escuchar mensajes desde el webview
-        webviewView.webview.onDidReceiveMessage(async (message) => {
-            switch (message.command) {
-                case 'sendPrompt':
-                    const prompt = message.prompt;
-                    const selectedText = message.selectedText;
-                    
-                    // Obtener contexto del archivo activo
-                    const contextInfo = await this._getCurrentFileContext();
-                    
-                    // Enviar a la IA
-                    const response = await this._aiAssistant.sendPrompt(
-                        prompt,
-                        contextInfo,
-                        selectedText
-                    );
-                    
-                    webviewView.webview.postMessage({ command: 'receiveResponse', text: response });
-                    break;
+        try {
+            htmlContent = fs.readFileSync(htmlPath, 'utf8');
+            console.log('✅ HTML leído correctamente, tamaño:', htmlContent.length);
+        } catch (err) {
+            console.error('❌ Error al leer chat.html:', err);
+            webviewView.webview.html = this._getErrorHtml(`Error al cargar el panel: ${err}`);
+            return;
+        }
 
-                case 'applyEdit':
-                    await this._applyEdit(message.newCode);
-                    webviewView.webview.postMessage({ command: 'editApplied' });
-                    break;
+        // Obtener URI del CSS y reemplazar el marcador
+        try {
+            const cssUri = webviewView.webview.asWebviewUri(
+                vscode.Uri.joinPath(this._extensionUri, 'media', 'styles.css')
+            );
+            console.log('✅ CSS URI generada:', cssUri.toString());
+            
+            // Reemplazar el marcador {{cssUri}} en el HTML
+            htmlContent = htmlContent.replace(/{{cssUri}}/g, cssUri.toString());
+            
+        } catch (err) {
+            console.error('❌ Error al procesar URIs:', err);
+            webviewView.webview.html = this._getErrorHtml(`Error al procesar recursos: ${err}`);
+            return;
+        }
+
+        // Asignar el HTML al webview
+        webviewView.webview.html = htmlContent;
+
+        // Crear un array para los subscriptions del webview
+        const disposables: vscode.Disposable[] = [];
+
+        // Manejar mensajes desde el webview
+        const messageListener = webviewView.webview.onDidReceiveMessage(async (message) => {
+            console.log('📩 Mensaje recibido del webview:', message.command);
+            
+            try {
+                switch (message.command) {
+                    case 'sendPrompt':
+                        await this._handleSendPrompt(webviewView, message);
+                        break;
+
+                    case 'getSelectedText':
+                        await this._handleGetSelectedText(webviewView);
+                        break;
+
+                    case 'getContextInfo':
+                        await this._handleGetContextInfo(webviewView);
+                        break;
+
+                    case 'openConfig':
+                        vscode.commands.executeCommand('amara-copilot.openAIConfig');
+                        break;
+
+                    default:
+                        console.warn('⚠️ Comando desconocido:', message.command);
+                }
+            } catch (err) {
+                console.error('❌ Error procesando mensaje:', err);
+                webviewView.webview.postMessage({ 
+                    command: 'error', 
+                    text: `Error: ${err instanceof Error ? err.message : String(err)}` 
+                });
             }
+        });
+
+        // Añadir el listener a los disposables
+        disposables.push(messageListener);
+
+        // Añadir los disposables a la suscripción del contexto cuando la vista se cierre
+        webviewView.onDidDispose(() => {
+            console.log('Vista cerrada, limpiando recursos');
+            while (disposables.length) {
+                const disposable = disposables.pop();
+                if (disposable) {
+                    disposable.dispose();
+                }
+            }
+        });
+
+        // Notificar que el webview está listo
+        webviewView.webview.postMessage({ command: 'ready' });
+    }
+
+    private async _handleSendPrompt(webviewView: vscode.WebviewView, message: any) {
+        const prompt = message.prompt;
+        const selectedText = message.selectedText || '';
+
+        if (!prompt) {
+            webviewView.webview.postMessage({ 
+                command: 'error', 
+                text: 'El mensaje no puede estar vacío' 
+            });
+            return;
+        }
+
+        // Obtener contexto del archivo actual
+        const contextInfo = await this._getCurrentFileContext();
+
+        // Enviar a la IA
+        const response = await this._aiAssistant.sendPrompt(
+            prompt,
+            contextInfo,
+            selectedText
+        );
+
+        webviewView.webview.postMessage({ 
+            command: 'receiveResponse', 
+            text: response 
         });
     }
 
-    private _getHtmlForWebview(): string {
-        return `<!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {
-                    font-family: var(--vscode-font-family);
-                    padding: 10px;
-                    color: var(--vscode-editor-foreground);
-                    background-color: var(--vscode-editor-background);
-                }
-                .chat-container {
-                    display: flex;
-                    flex-direction: column;
-                    height: 100%;
-                }
-                #messages {
-                    flex: 1;
-                    overflow-y: auto;
-                    margin-bottom: 10px;
-                    border: 1px solid var(--vscode-panel-border);
-                    padding: 8px;
-                    border-radius: 4px;
-                }
-                .message {
-                    margin-bottom: 8px;
-                    padding: 8px;
-                    border-radius: 4px;
-                    white-space: pre-wrap;
-                }
-                .user {
-                    background-color: var(--vscode-input-background);
-                }
-                .assistant {
-                    background-color: var(--vscode-editor-inactiveSelectionBackground);
-                }
-                #prompt {
-                    width: 100%;
-                    min-height: 60px;
-                    box-sizing: border-box;
-                    margin-bottom: 5px;
-                    background-color: var(--vscode-input-background);
-                    color: var(--vscode-input-foreground);
-                    border: 1px solid var(--vscode-input-border);
-                    padding: 4px;
-                    font-family: inherit;
-                }
-                #send {
-                    background-color: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                    border: none;
-                    padding: 6px 12px;
-                    cursor: pointer;
-                    font-family: inherit;
-                }
-                #send:hover {
-                    background-color: var(--vscode-button-hoverBackground);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="chat-container">
-                <div id="messages"></div>
-                <textarea id="prompt" placeholder="Escribe tu pregunta o instrucción..."></textarea>
-                <button id="send">Enviar</button>
-            </div>
-            <script>
-                const vscode = acquireVsCodeApi();
-                const messagesDiv = document.getElementById('messages');
-                const promptInput = document.getElementById('prompt');
-                const sendButton = document.getElementById('send');
+    private async _handleGetSelectedText(webviewView: vscode.WebviewView) {
+        const editor = vscode.window.activeTextEditor;
+        let selectedText = '';
 
-                let selectedText = '';
+        if (editor && !editor.selection.isEmpty) {
+            const selection = editor.selection;
+            selectedText = editor.document.getText(selection);
+        }
 
-                // Obtener el texto seleccionado del editor activo (solicitar a la extensión)
-                // Por ahora lo enviaremos vacío; en una versión avanzada podrías pedirlo al hacer clic.
+        webviewView.webview.postMessage({ 
+            command: 'selectedText', 
+            text: selectedText 
+        });
+    }
 
-                sendButton.addEventListener('click', () => {
-                    const prompt = promptInput.value.trim();
-                    if (!prompt) return;
-
-                    // Mostrar mensaje del usuario
-                    addMessage('user', prompt);
-
-                    // Enviar a la extensión
-                    vscode.postMessage({
-                        command: 'sendPrompt',
-                        prompt: prompt,
-                        selectedText: selectedText
-                    });
-
-                    promptInput.value = '';
-                    addMessage('assistant', 'Pensando...');
-                });
-
-                window.addEventListener('message', event => {
-                    const message = event.data;
-                    switch (message.command) {
-                        case 'receiveResponse':
-                            updateLastMessage('assistant', message.text);
-                            break;
-                        case 'editApplied':
-                            addMessage('assistant', '✅ Cambios aplicados.');
-                            break;
-                    }
-                });
-
-                function addMessage(role, text) {
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = 'message ' + role;
-                    msgDiv.textContent = text;
-                    messagesDiv.appendChild(msgDiv);
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }
-
-                function updateLastMessage(role, text) {
-                    const lastMsg = messagesDiv.lastChild;
-                    if (lastMsg && lastMsg.className.includes('assistant')) {
-                        lastMsg.textContent = text;
-                    } else {
-                        addMessage(role, text);
-                    }
-                }
-
-                // (Opcional) Podrías pedir el texto seleccionado a la extensión, 
-                // pero por simplicidad lo dejamos así.
-            </script>
-        </body>
-        </html>`;
+    private async _handleGetContextInfo(webviewView: vscode.WebviewView) {
+        const fileContext = await this._getCurrentFileContext();
+        
+        webviewView.webview.postMessage({
+            command: 'contextInfo',
+            fileName: fileContext ? fileContext.fileName : null
+        });
     }
 
     private async _getCurrentFileContext(): Promise<{ fileName: string; content: string } | null> {
@@ -216,23 +201,35 @@ class AmaraCopilotViewProvider implements vscode.WebviewViewProvider {
         };
     }
 
-    private async _applyEdit(newCode: string) {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            vscode.window.showErrorMessage('No hay un archivo activo para aplicar la edición.');
-            return;
+    private _getErrorHtml(errorMessage: string): string {
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 20px;
+            color: var(--vscode-errorForeground);
         }
-
-        const document = editor.document;
-        const fullRange = new vscode.Range(
-            document.positionAt(0),
-            document.positionAt(document.getText().length)
-        );
-
-        await editor.edit(editBuilder => {
-            editBuilder.replace(fullRange, newCode);
-        });
+        .error {
+            background-color: var(--vscode-inputValidation-errorBackground);
+            border: 1px solid var(--vscode-inputValidation-errorBorder);
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error">
+        <h3>❌ Error en Amara Copilot</h3>
+        <p>${errorMessage}</p>
+    </div>
+</body>
+</html>`;
     }
 }
 
-export function deactivate() {}
+export function deactivate() {
+    console.log('👋 Amara Copilot desactivado');
+}

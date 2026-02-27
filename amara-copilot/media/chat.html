@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{cssUri}}">
+</head>
+<body>
+    <div class="chat-header">
+        <h3>Amara Copilot</h3>
+        <div class="header-actions">
+            <button id="configBtn" title="Configuración">⚙️</button>
+            <span class="model-badge" id="modelBadge">LM Studio</span>
+        </div>
+    </div>
+
+    <div class="context-bar" id="contextBar" style="display: none;">
+        <span>📄 Archivo activo:</span>
+        <span class="context-file" id="currentFile"></span>
+    </div>
+
+    <div class="messages-area" id="messagesArea"></div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <textarea 
+                id="prompt" 
+                placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
+                rows="1"
+            ></textarea>
+            <button id="send" title="Enviar">➤</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const vscode = acquireVsCodeApi();
+            
+            const messagesArea = document.getElementById('messagesArea');
+            const promptInput = document.getElementById('prompt');
+            const sendButton = document.getElementById('send');
+            const contextBar = document.getElementById('contextBar');
+            const currentFileSpan = document.getElementById('currentFile');
+            const configBtn = document.getElementById('configBtn');
+
+            let isLoading = false;
+            let selectedText = '';
+
+            configBtn.addEventListener('click', () => {
+                vscode.postMessage({ command: 'openConfig' });
+            });
+
+            // Escapa HTML para evitar inyección
+            function escapeHtml(unsafe) {
+                return unsafe
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            // Formatea el mensaje: extrae bloques de código ```...``` y los convierte en <pre><code>
+            // El texto normal se escapa y se le aplica formato markdown simple (negritas, itálicas, inline code)
+            function formatMessage(text) {
+                if (!text) return '';
+
+                const parts = [];
+                let lastIndex = 0;
+                const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+                let match;
+
+                // Separar bloques de código del texto normal
+                while ((match = codeBlockRegex.exec(text)) !== null) {
+                    // Texto antes del bloque
+                    if (match.index > lastIndex) {
+                        parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+                    }
+                    // Bloque de código (ignoramos el lenguaje)
+                    parts.push({ type: 'code', content: match[2] });
+                    lastIndex = match.index + match[0].length;
+                }
+                // Texto restante después del último bloque
+                if (lastIndex < text.length) {
+                    parts.push({ type: 'text', content: text.substring(lastIndex) });
+                }
+
+                let html = '';
+                parts.forEach(part => {
+                    if (part.type === 'text') {
+                        // Escapar texto normal
+                        let escaped = escapeHtml(part.content);
+                        // Aplicar formato markdown simple
+                        // Negritas **texto** o __texto__
+                        escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                        escaped = escaped.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+                        // Itálicas *texto* o _texto_
+                        escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+                        escaped = escaped.replace(/_([^_]+)_/g, '<em>$1</em>');
+                        // Código inline `texto`
+                        escaped = escaped.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+                        // Párrafos (separados por doble salto de línea)
+                        const paragraphs = escaped.split('\n\n');
+                        escaped = paragraphs.map(p => {
+                            if (p.trim() === '') return '';
+                            // Si ya contiene etiquetas de bloque, no lo envolvemos en <p>
+                            if (p.includes('<h') || p.includes('<blockquote') || p.includes('<ul') || p.includes('<ol') || p.includes('<pre')) {
+                                return p;
+                            }
+                            return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
+                        }).join('');
+                        html += escaped;
+                    } else {
+                        // Código: escapar y envolver en <pre><code>
+                        const codeEscaped = escapeHtml(part.content);
+                        html += `<pre><code>${codeEscaped}</code></pre>`;
+                    }
+                });
+                return html;
+            }
+
+            // Añade botones de copiar a cada bloque <pre>
+            function addCopyButtons(container) {
+                const pres = container.querySelectorAll('pre');
+                pres.forEach(pre => {
+                    if (pre.parentElement.querySelector('.copy-button')) return;
+
+                    const codeElement = pre.querySelector('code');
+                    if (!codeElement) return;
+                    
+                    const code = codeElement.textContent;
+
+                    const button = document.createElement('button');
+                    button.className = 'copy-button';
+                    button.setAttribute('title', 'Copiar código');
+
+                    button.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        try {
+                            await navigator.clipboard.writeText(code);
+                            button.classList.add('copied');
+                            button.textContent = '✅ Copiado!';
+                            setTimeout(() => {
+                                button.classList.remove('copied');
+                                button.innerHTML = ''; // Vacío para que el CSS muestre el icono con ::before
+                                button.setAttribute('title', 'Copiar código');
+                            }, 2000);
+                        } catch (err) {
+                            button.textContent = '❌ Error';
+                            setTimeout(() => {
+                                button.innerHTML = '';
+                                button.setAttribute('title', 'Copiar código');
+                            }, 2000);
+                        }
+                    });
+
+                    pre.style.marginTop = '40px';
+                    pre.style.position = 'relative';
+                    pre.parentNode.insertBefore(button, pre);
+                });
+            }
+
+            function addMessage(role, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message ' + role;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+
+                if (role === 'assistant' && content === 'Pensando...') {
+                    const typingIndicator = document.createElement('div');
+                    typingIndicator.className = 'typing-indicator';
+                    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+                    contentDiv.appendChild(typingIndicator);
+                } else {
+                    contentDiv.innerHTML = formatMessage(content);
+                    // Añadir botones después de insertar en el DOM
+                    setTimeout(() => {
+                        addCopyButtons(contentDiv);
+                    }, 0);
+                }
+
+                messageDiv.appendChild(contentDiv);
+                messagesArea.appendChild(messageDiv);
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            }
+
+            function updateLastMessage(content) {
+                const lastMessage = messagesArea.lastChild;
+                if (lastMessage && lastMessage.className.includes('assistant')) {
+                    const contentDiv = lastMessage.querySelector('.message-content');
+                    contentDiv.innerHTML = formatMessage(content);
+                    setTimeout(() => {
+                        addCopyButtons(contentDiv);
+                    }, 0);
+                }
+
+                isLoading = false;
+                promptInput.disabled = false;
+                sendButton.disabled = false;
+                promptInput.focus();
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            }
+
+            function sendMessage() {
+                const prompt = promptInput.value.trim();
+                if (!prompt || isLoading) return;
+
+                addMessage('user', prompt);
+
+                isLoading = true;
+                promptInput.disabled = true;
+                sendButton.disabled = true;
+
+                vscode.postMessage({
+                    command: 'sendPrompt',
+                    prompt: prompt,
+                    selectedText: selectedText
+                });
+
+                promptInput.value = '';
+                promptInput.style.height = 'auto';
+                addMessage('assistant', 'Pensando...');
+            }
+
+            // Event listeners
+            sendButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendMessage();
+            });
+
+            promptInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            promptInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+
+            window.addEventListener('message', event => {
+                const message = event.data;
+                switch (message.command) {
+                    case 'receiveResponse':
+                        updateLastMessage(message.text);
+                        break;
+                    case 'selectedText':
+                        selectedText = message.text;
+                        break;
+                    case 'contextInfo':
+                        if (message.fileName) {
+                            const fileNameParts = message.fileName.split(/[\\/]/);
+                            currentFileSpan.textContent = fileNameParts[fileNameParts.length - 1];
+                            contextBar.style.display = 'flex';
+                        } else {
+                            contextBar.style.display = 'none';
+                        }
+                        break;
+                    case 'ready':
+                        console.log('Webview listo');
+                        break;
+                }
+            });
+
+            // Inicialización
+            vscode.postMessage({ command: 'getContextInfo' });
+            vscode.postMessage({ command: 'getSelectedText' });
+
+            setInterval(() => {
+                vscode.postMessage({ command: 'getContextInfo' });
+                vscode.postMessage({ command: 'getSelectedText' });
+            }, 2000);
+
+            promptInput.focus();
+        })();
+    </script>
+</body>
+</html>
